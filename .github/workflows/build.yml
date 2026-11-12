@@ -31,8 +31,21 @@ jobs:
       - name: Check Flutter
         run: flutter --version
 
+      - name: Generate missing Android project files
+        run: |
+          flutter create --platforms=android --org com.lockzo.security --project-name lockzo .
+
+      - name: Create Android local.properties
+        run: |
+          FLUTTER_BIN="$(command -v flutter)"
+          FLUTTER_ROOT="$(cd "$(dirname "$FLUTTER_BIN")/.." && pwd)"
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+
       - name: Install Dependencies
         run: flutter pub get
+
+      - name: Generate LOCKZO App Icon
+        run: dart run flutter_launcher_icons
 
       - name: Build APK
         run: flutter build apk --release
@@ -42,3 +55,4 @@ jobs:
         with:
           name: LOCKZO-Release-APK
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
