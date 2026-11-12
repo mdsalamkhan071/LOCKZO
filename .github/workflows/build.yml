@@ -31,10 +31,17 @@ jobs:
       - name: Check Flutter
         run: flutter --version
 
-      - name: Generate Android project files
+      - name: Generate Android Project
         run: flutter create --platforms=android --org com.lockzo.security --project-name lockzo .
 
-      - name: Create Android local.properties
+      - name: Fix Android Gradle Properties
+        run: |
+          cat > android/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError
+          android.useAndroidX=true
+          EOF
+
+      - name: Create local.properties
         run: |
           FLUTTER_BIN="$(command -v flutter)"
           FLUTTER_ROOT="$(cd "$(dirname "$FLUTTER_BIN")/.." && pwd)"
@@ -45,6 +52,26 @@ jobs:
 
       - name: Generate LOCKZO App Icon
         run: dart run flutter_launcher_icons
+
+      - name: Clean XML Resource Files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("android/app/src/main/res")
+          for path in root.rglob("*.xml"):
+              text = path.read_text(encoding="utf-8")
+              text = re.sub(r'<\?xml\s+.*?\?>', '', text, flags=re.I | re.S)
+              text = text.lstrip("\ufeff \t\r\n")
+              path.write_text(text, encoding="utf-8")
+              print("Fixed:", path)
+          PY
+
+      - name: Verify Android Resources
+        run: |
+          grep -R -n '<?xml' android/app/src/main/res || true
+          test -f assets/icon/lockzo_icon.png
 
       - name: Build APK
         run: flutter build apk --release --android-skip-build-dependency-validation
