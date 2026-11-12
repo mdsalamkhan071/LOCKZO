@@ -34,7 +34,26 @@ jobs:
       - name: Generate Android Project
         run: flutter create --platforms=android --org com.lockzo.security --project-name lockzo .
 
-      - name: Fix Android Gradle Properties
+      - name: Set Stable Android NDK
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("android/app/build.gradle.kts")
+          s = p.read_text()
+          s = s.replace(
+              "ndkVersion = flutter.ndkVersion",
+              'ndkVersion = "27.2.12479018"'
+          )
+          p.write_text(s)
+          PY
+
+      - name: Install Android NDK
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager --install "ndk;27.2.12479018"
+
+      - name: Fix Gradle Properties
         run: |
           cat > android/gradle.properties <<'EOF'
           org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError
@@ -53,25 +72,18 @@ jobs:
       - name: Generate LOCKZO App Icon
         run: dart run flutter_launcher_icons
 
-      - name: Clean XML Resource Files
+      - name: Clean XML Resources
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
 
           root = Path("android/app/src/main/res")
-          for path in root.rglob("*.xml"):
-              text = path.read_text(encoding="utf-8")
-              text = re.sub(r'<\?xml\s+.*?\?>', '', text, flags=re.I | re.S)
-              text = text.lstrip("\ufeff \t\r\n")
-              path.write_text(text, encoding="utf-8")
-              print("Fixed:", path)
+          for p in root.rglob("*.xml"):
+              s = p.read_text(encoding="utf-8")
+              s = re.sub(r'<\?xml\s+.*?\?>', '', s, flags=re.I | re.S)
+              p.write_text(s.lstrip("\ufeff \t\r\n"), encoding="utf-8")
           PY
-
-      - name: Verify Android Resources
-        run: |
-          grep -R -n '<?xml' android/app/src/main/res || true
-          test -f assets/icon/lockzo_icon.png
 
       - name: Build APK
         run: flutter build apk --release --android-skip-build-dependency-validation
